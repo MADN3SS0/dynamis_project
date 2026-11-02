@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DYNAMIS</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Michroma&amp;family=Chakra+Petch:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+html{scroll-behavior:smooth}
+body{margin:0;background:#070707;color:#FFFFFF;font-family:'Chakra Petch',system-ui,sans-serif;font-size:16px;line-height:1.5}
+*{box-sizing:border-box}
+::selection{background:#FFFFFF;color:#070707}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:left}
+a:focus-visible,button:focus-visible{outline:2px solid #8C8C8C;outline-offset:3px}
+
+.ds-mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+.ds-disp{font-family:'Michroma','Chakra Petch',sans-serif;font-weight:400;text-transform:uppercase}
+.ds-tag::before{content:"";display:inline-block;width:8px;height:8px;margin-right:12px;background:currentColor}
+.ds-out-l{color:transparent;-webkit-text-stroke:1.5px #FFFFFF}
+.ds-out-d{color:transparent;-webkit-text-stroke:1.5px #0A0A0A}
+
+.ds-br{position:absolute;width:18px;height:18px;border:0 solid currentColor;pointer-events:none}
+.ds-br.tl{top:14px;left:14px;border-top-width:2px;border-left-width:2px}
+.ds-br.tr{top:14px;right:14px;border-top-width:2px;border-right-width:2px}
+.ds-br.bl{bottom:14px;left:14px;border-bottom-width:2px;border-left-width:2px}
+.ds-br.brr{bottom:14px;right:14px;border-bottom-width:2px;border-right-width:2px}
+
+/* Photo zoom. The ruler is the zoom scale: 20 ticks = 20 steps of 0.1 (1.0x to 3.0x), long ticks every 0.5 */
+.ds-ruler{position:absolute;left:47px;right:47px;bottom:14px;height:12px;pointer-events:none;background-image:repeating-linear-gradient(90deg,currentColor 0 1px,transparent 1px 5%),repeating-linear-gradient(90deg,currentColor 0 1px,transparent 1px 25%),linear-gradient(currentColor,currentColor);background-size:100% 6px,100% 12px,1px 12px;background-repeat:no-repeat;background-position:left bottom,left bottom,right bottom;opacity:.7}
+.ds-zl{transition:transform .22s ease-out,transform-origin .22s ease-out;will-change:transform}
+.ds-zoom{position:absolute;left:44px;bottom:6px;width:calc(100% - 88px);height:28px;margin:0;padding:0;background:transparent;-webkit-appearance:none;appearance:none;cursor:ew-resize;color:inherit}
+.ds-zoom::-webkit-slider-runnable-track{height:28px;background:transparent;border:0}
+.ds-zoom::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:6px;height:28px;background:currentColor;border:0;border-radius:0}
+.ds-zoom::-moz-range-track{height:28px;background:transparent;border:0}
+.ds-zoom::-moz-range-thumb{width:6px;height:28px;background:currentColor;border:0;border-radius:0}
+.ds-zoom:focus-visible{outline:2px solid #8C8C8C;outline-offset:2px}
+.ds-stage{cursor:crosshair}
+.ds-stage[data-rv="1"]{cursor:none}
+
+/* Reticle that replaces the mouse cursor over a photo (inverts against whatever is under it) */
+.ds-ret{position:absolute;width:48px;height:48px;margin:-24px 0 0 -24px;pointer-events:none;color:#FFFFFF;mix-blend-mode:difference;opacity:0;transition:opacity .15s}
+.ds-ret[data-on="1"]{opacity:1}
+.ds-ret i{position:absolute;width:12px;height:12px;border:0 solid currentColor}
+.ds-ret i.a{top:0;left:0;border-top-width:2px;border-left-width:2px}
+.ds-ret i.b{top:0;right:0;border-top-width:2px;border-right-width:2px}
+.ds-ret i.c{bottom:0;left:0;border-bottom-width:2px;border-left-width:2px}
+.ds-ret i.d{bottom:0;right:0;border-bottom-width:2px;border-right-width:2px}
+.ds-ret i.dot{top:22px;left:22px;width:4px;height:4px;background:currentColor;border:0}
+.ds-ret span{position:absolute;top:34px;left:58px;white-space:nowrap;font-size:11px}
+.ds-ret[data-f="1"] span{left:auto;right:58px}
+
+/* Navigator: shows which part of the photo is in view while zoomed */
+.ds-mm{position:absolute;top:14px;right:44px;border:1px solid currentColor;background:rgba(128,128,128,.16);opacity:0;transition:opacity .2s;pointer-events:none}
+.ds-mm[data-on="1"]{opacity:.9}
+.ds-mm i{position:absolute;border:1.5px solid currentColor}
+.ds-mm i::before{content:"";position:absolute;inset:0;background:currentColor;opacity:.25}
+
+/* Pixel arrows: two copies; on hover the first slides out and the second slides in */
+.ds-ico{position:relative;display:inline-block;width:20px;height:20px;overflow:hidden;flex:none}
+.ds-ico svg{position:absolute;left:0;top:0;width:20px;height:20px;fill:currentColor;transition:transform .5s cubic-bezier(.7,0,.2,1)}
+.ds-ico svg:nth-child(2){transition-delay:.04s}
+.ds-ico[data-d="down"] svg:nth-child(2){transform:translateY(-110%)}
+.ds-ico[data-d="up"] svg:nth-child(2){transform:translateY(110%)}
+.ds-ico[data-d="right"] svg:nth-child(2){transform:translateX(-110%)}
+.ds-h:hover .ds-ico[data-d="down"] svg:nth-child(1),.ds-h:focus-visible .ds-ico[data-d="down"] svg:nth-child(1){transform:translateY(110%)}
+.ds-h:hover .ds-ico[data-d="up"] svg:nth-child(1),.ds-h:focus-visible .ds-ico[data-d="up"] svg:nth-child(1){transform:translateY(-110%)}
+.ds-h:hover .ds-ico[data-d="right"] svg:nth-child(1),.ds-h:focus-visible .ds-ico[data-d="right"] svg:nth-child(1){transform:translateX(110%)}
+.ds-h:hover .ds-ico svg:nth-child(2),.ds-h:focus-visible .ds-ico svg:nth-child(2){transform:translate(0,0)}
+
+/* Primary button: fill sweeps in from the left, leaves to the right */
+.ds-btn{position:relative;overflow:hidden;isolation:isolate;display:inline-flex;align-items:center;gap:18px;min-height:52px;padding:0 22px 0 26px;border:1px solid #0A0A0A;background:#0A0A0A;color:#FFFFFF;transition:color .35s cubic-bezier(.7,0,.2,1),transform .15s}
+.ds-btn::before{content:"";position:absolute;inset:0;z-index:-1;background:#FFFFFF;transform:scaleX(0);transform-origin:right;transition:transform .5s cubic-bezier(.7,0,.2,1)}
+.ds-btn:hover,.ds-btn:focus-visible{color:#0A0A0A}
+.ds-btn:hover::before,.ds-btn:focus-visible::before{transform:scaleX(1);transform-origin:left}
+.ds-btn:active{transform:translateY(1px)}
+
+/* Text link with arrow */
+.ds-link{display:inline-flex;align-items:center;gap:12px;min-height:44px;border-bottom:1px solid #FFFFFF;transition:gap .35s cubic-bezier(.7,0,.2,1)}
+.ds-link:hover,.ds-link:focus-visible{gap:20px}
+
+/* Nav underline */
+.ds-nl{position:relative}
+.ds-nl::after{content:"";position:absolute;left:0;right:0;bottom:9px;height:1px;background:currentColor;transform:scaleX(0);transform-origin:right;transition:transform .4s cubic-bezier(.7,0,.2,1)}
+.ds-nl:hover::after,.ds-nl:focus-visible::after{transform:scaleX(1);transform-origin:left}
+
+/* Model chips */
+.ds-chip{position:relative;overflow:hidden;isolation:isolate;display:inline-flex;align-items:center;min-height:44px;padding:0 20px;border:1px solid currentColor;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;letter-spacing:.1em;transition:color .35s cubic-bezier(.7,0,.2,1),background .2s}
+.ds-chip::before{content:"";position:absolute;inset:0;z-index:-1;background:#FFFFFF;transform:scaleX(0);transform-origin:right;transition:transform .45s cubic-bezier(.7,0,.2,1)}
+.ds-chip.on-dark{color:#FFFFFF}
+.ds-chip.on-dark:hover,.ds-chip.on-dark:focus-visible{color:#070707}
+.ds-chip.on-dark:hover::before,.ds-chip.on-dark:focus-visible::before{transform:scaleX(1);transform-origin:left}
+.ds-chip.on-dark[data-on="1"]{background:#FFFFFF;color:#070707}
+
+/* Series rows */
+.ds-pick{position:relative;overflow:hidden;isolation:isolate;color:#0A0A0A;transition:color .35s cubic-bezier(.7,0,.2,1),background .3s}
+.ds-pick::before{content:"";position:absolute;inset:0;z-index:-1;background:#CFCFCF;transform:scaleX(0);transform-origin:right;transition:transform .5s cubic-bezier(.7,0,.2,1)}
+.ds-pick:hover::before,.ds-pick:focus-visible::before{transform:scaleX(1);transform-origin:left}
+.ds-pick[data-on="1"]{background:#0A0A0A;color:#FFFFFF}
+.ds-pick[data-on="1"]::before{background:#262626}
+
+.ds-word{transition:color .3s}
+.ds-word[data-o="1"]{color:transparent;-webkit-text-stroke:2px #FFFFFF}
+.ds-word[data-o="0"]{color:#FFFFFF;-webkit-text-stroke:2px #FFFFFF}
+.ds-prin:hover .ds-word[data-o="1"]{color:#FFFFFF}
+.ds-prin:hover .ds-word[data-o="0"]{color:transparent}
+
+.ds-cell{padding:18px 16px;border-bottom:1px solid #2A2A2A;transition:background .2s,color .2s}
+.ds-cell[data-on="1"]{background:#FFFFFF;color:#070707;border-bottom-color:#CFCFCF}
+
+/* Terms + cookies gate */
+.ds-gate{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;background:rgba(7,7,7,.9);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.ds-gate[data-open="0"]{display:none}
+.ds-gate-card{position:relative;width:100%;max-width:640px;margin:auto;padding:44px 40px 36px;background:#070707;border:1px solid #FFFFFF;color:#FFFFFF}
+.ds-gate-card p{margin:0}
+.ds-gate-card a.ds-ul{border-bottom:1px solid currentColor}
+.ds-gate-btns{display:flex;flex-wrap:wrap;gap:12px}
+.ds-gate-btns .ds-chip{flex:1 1 180px;justify-content:center;min-height:52px;cursor:pointer;text-align:center}
+.ds-opt{display:none;flex-direction:column;border-top:1px solid #2A2A2A}
+.ds-gate[data-custom="1"] .ds-opt{display:flex}
+.ds-gate[data-custom="1"] .ds-gate-btns.main{display:none}
+.ds-gate:not([data-custom="1"]) .ds-gate-btns.save{display:none}
+.ds-orow{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:16px 0;border-bottom:1px solid #2A2A2A}
+.ds-sw{position:relative;flex:none;width:52px;height:28px;margin-top:2px;border:1px solid #FFFFFF;background:transparent;cursor:pointer;transition:background .25s}
+.ds-sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;background:#FFFFFF;transition:transform .3s cubic-bezier(.7,0,.2,1),background .25s}
+.ds-sw[aria-checked="true"]{background:#FFFFFF}
+.ds-sw[aria-checked="true"]::after{transform:translateX(24px);background:#070707}
+.ds-sw[data-lock="1"]{opacity:.55;cursor:not-allowed}
+.ds-sw:focus-visible{outline:2px solid #8C8C8C;outline-offset:3px}
+@media (max-width:560px){.ds-gate-card{padding:36px 20px 24px}}
+@media (max-width:900px){.ds-vert{display:none}}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .ds-btn,.ds-btn::before,.ds-chip,.ds-chip::before,.ds-pick,.ds-pick::before,.ds-ico svg,.ds-nl::after,.ds-link,.ds-word,.ds-cell,.ds-zl,.ds-ret,.ds-mm,.ds-sw,.ds-sw::after{transition:none}
+}
+</style>
+</helmet>
+
+<div id="top" style="width:100%; background:#070707; color:#FFFFFF; overflow-x:clip">
+
+  <!-- HEADER -->
+  <header style="background:#070707; border-bottom:1px solid #2A2A2A">
+    <div style="max-width:1280px; margin:0 auto; padding:10px clamp(16px, 4vw, 40px); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 24px">
+      <a href="#top" style="display:inline-flex; align-items:center; min-height:56px">
+        <img src="./assets/5a10825ed1aaa73601780c60d247c9ec.png" alt="Dynamis" style="display:block; height:34px; width:auto">
+      </a>
+      <nav aria-label="Primary" class="ds-mono" style="display:flex; flex-wrap:wrap; gap:0 28px">
+        <a class="ds-nl" href="#principles" style="display:inline-flex; align-items:center; min-height:44px">Principles</a>
+        <a class="ds-nl" href="#series" style="display:inline-flex; align-items:center; min-height:44px">Series</a>
+        <a class="ds-nl" href="#compare" style="display:inline-flex; align-items:center; min-height:44px">Compare</a>
+        <a class="ds-nl" href="#contact" style="display:inline-flex; align-items:center; min-height:44px">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section style="position:relative; background-color:#070707; background-image:linear-gradient(#171717 1px, transparent 1px), linear-gradient(90deg, #171717 1px, transparent 1px); background-size:64px 64px; background-position:-1px -1px">
+    <span class="ds-mono ds-vert" aria-hidden="true" style="position:absolute; right:clamp(6px, 1.4vw, 20px); top:120px; writing-mode:vertical-rl; letter-spacing:.3em; color:#9A9A9A">Discipline drives distance — Dynamis</span>
+    <div style="max-width:1280px; margin:0 auto; padding:24px clamp(16px, 4vw, 40px) 112px">
+      <div class="ds-mono" style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 24px; padding-bottom:20px; border-bottom:1px solid #2A2A2A; color:#9A9A9A">
+        <span class="ds-tag">DDU series</span>
+        <span>03 models</span>
+        <span>Sec. 00 — Index</span>
+      </div>
+
+      <div style="position:relative; margin-top:56px">
+        <h1 class="ds-disp" style="margin:0 0 -0.55em; position:relative; z-index:2; mix-blend-mode:difference; color:#FFFFFF; font-size:clamp(34px, 11vw, 150px); line-height:1; letter-spacing:-0.01em; pointer-events:none">Dynamis</h1>
+
+        <div style="display:flex; flex-wrap:wrap; gap:32px 40px; align-items:flex-start">
+          <div style="flex:1 1 280px; min-width:0; padding-top:calc(clamp(34px, 11vw, 150px) * 0.5 + 28px); display:flex; flex-direction:column; align-items:flex-start; gap:28px">
+            <p class="ds-disp" style="margin:0; font-size:clamp(20px, 2.4vw, 34px); line-height:1.2">Discipline<br><span class="ds-out-l">drives</span><br>distance.</p>
+            <div role="group" aria-label="Choose a model" style="display:flex; flex-wrap:wrap; gap:8px">
+              <sc-for list="{{ products }}" as="p" hint-placeholder-count="3">
+                <button class="ds-chip on-dark" data-on="{{ p.on }}" aria-pressed="{{ p.pressed }}" onClick="{{ p.pick }}">{{ p.short }}</button>
+              </sc-for>
+            </div>
+            <a href="#series" class="ds-mono ds-link ds-h">Explore the series
+              <span class="ds-ico" data-d="down" aria-hidden="true">
+                <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M2 0h1v3H2zM0 2h1v1H0zM4 2h1v1H4zM1 3h3v1H1zM2 4h1v1H2z"></path></svg>
+                <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M2 0h1v3H2zM0 2h1v1H0zM4 2h1v1H4zM1 3h3v1H1zM2 4h1v1H2z"></path></svg>
+              </span>
+            </a>
+          </div>
+
+          <div class="ds-stage" data-zoom-stage="h" data-rv="{{ hz.rv }}" onMouseMove="{{ hz.move }}" onMouseLeave="{{ hz.leave }}" onDoubleClick="{{ hz.reset }}" style="position:relative; z-index:1; flex:2 1 460px; min-width:0; aspect-ratio:4 / 3; overflow:hidden; background:#D9D9D9; color:#0A0A0A">
+            <div class="ds-zl" role="img" aria-label="Image placeholder: {{ cur.ph }}" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; background-image:linear-gradient(#C4C4C4 1px, transparent 1px), linear-gradient(90deg, #C4C4C4 1px, transparent 1px); background-size:48px 48px; transform: {{ hz.transform }}; transform-origin: {{ hz.origin }}">
+              <svg width="56" height="55" viewBox="0 0 772 756" fill="currentColor" aria-hidden="true"><path d="M0 0h156v156H0zM318 1h292v155H318zM156 163h154v155H156zM610 164h162v430H610zM17 326h121v105H17zM326 326h130v104H326zM164 556L317 446V596H610V756H164z"></path></svg>
+              <span class="ds-disp" style="font-size:clamp(16px, 2vw, 28px); text-transform:none">{{ cur.ph }}</span>
+              <span class="ds-mono" style="opacity:.7">Image placeholder</span>
+            </div>
+            <i class="ds-br tl" aria-hidden="true"></i>
+            <i class="ds-br tr" aria-hidden="true"></i>
+            <i class="ds-br bl" aria-hidden="true"></i>
+            <i class="ds-br brr" aria-hidden="true"></i>
+            <div class="ds-mm" data-on="{{ hz.mm }}" aria-hidden="true" style="width:64px; height:48px"><i style="left: {{ hz.mmL }}; top: {{ hz.mmT }}; width: {{ hz.mmS }}; height: {{ hz.mmS }}"></i></div>
+            <span class="ds-mono" style="position:absolute; left:44px; bottom:36px">Fig. {{ cur.no }}</span>
+            <span class="ds-mono" style="position:absolute; right:44px; bottom:36px">Zoom {{ hz.label }}</span>
+            <div class="ds-ruler" aria-hidden="true"></div>
+            <input class="ds-zoom" type="range" min="1" max="3" step="0.1" value="{{ hz.value }}" onChange="{{ hz.setZoom }}" aria-label="Zoom {{ cur.name }} image">
+            <div class="ds-ret" data-on="{{ hz.rv }}" data-f="{{ hz.rf }}" aria-hidden="true" style="left: {{ hz.rx }}; top: {{ hz.ry }}"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="dot"></i><span class="ds-mono">{{ hz.tip }}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 PRINCIPLES -->
+  <section id="principles" style="position:relative; overflow:hidden; background:#070707">
+    <svg aria-hidden="true" viewBox="0 0 772 756" fill="currentColor" style="position:absolute; right:-4vw; top:48px; width:clamp(260px, 36vw, 540px); height:auto; color:#FFFFFF; opacity:0.05; pointer-events:none"><path d="M0 0h156v156H0zM318 1h292v155H318zM156 163h154v155H156zM610 164h162v430H610zM17 326h121v105H17zM326 326h130v104H326zM164 556L317 446V596H610V756H164z"></path></svg>
+    <div style="position:relative; max-width:1280px; margin:0 auto; padding:96px clamp(16px, 4vw, 40px) 112px">
+      <div class="ds-mono" style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 24px; padding-bottom:20px; color:#9A9A9A">
+        <span class="ds-tag">01 / Principles</span>
+        <span>Dynamis — DDU</span>
+      </div>
+      <sc-for list="{{ principles }}" as="w" hint-placeholder-count="3">
+        <div class="ds-prin" style="border-top:1px solid #2A2A2A; padding:24px 0 32px; display:flex; flex-direction:column; gap:16px">
+          <span class="ds-mono" style="color:#9A9A9A">{{ w.no }}</span>
+          <h2 class="ds-disp ds-word" data-o="{{ w.o }}" style="margin:0; font-size:clamp(34px, 9.5vw, 144px); line-height:1; letter-spacing:-0.02em">{{ w.word }}</h2>
+          <p style="margin:0; max-width:520px; color:#9A9A9A">[Add a short description of this principle.]</p>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- 02 SERIES -->
+  <section id="series" style="position:relative; background:#E6E6E6; color:#0A0A0A; margin-top:calc(-1 * clamp(28px, 5vw, 72px)); clip-path:polygon(0 clamp(28px, 5vw, 72px), 100% 0, 100% 100%, 0 100%)">
+    <svg aria-hidden="true" viewBox="0 0 772 756" fill="currentColor" style="position:absolute; left:-4vw; bottom:48px; width:clamp(240px, 30vw, 460px); height:auto; color:#0A0A0A; opacity:0.05; pointer-events:none"><path d="M0 0h156v156H0zM318 1h292v155H318zM156 163h154v155H156zM610 164h162v430H610zM17 326h121v105H17zM326 326h130v104H326zM164 556L317 446V596H610V756H164z"></path></svg>
+    <div style="position:relative; max-width:1280px; margin:0 auto; padding:calc(clamp(28px, 5vw, 72px) + 88px) clamp(16px, 4vw, 40px) 112px; display:flex; flex-direction:column; gap:56px">
+      <div style="display:flex; flex-direction:column; gap:20px">
+        <span class="ds-mono ds-tag" style="color:#4D4D4D">02 / DDU series</span>
+        <h2 class="ds-disp" style="margin:0; font-size:clamp(26px, 5vw, 68px); line-height:1.12">Three models.<br><span class="ds-out-d">One discipline.</span></h2>
+      </div>
+
+      <div style="display:flex; flex-wrap:wrap; gap:32px 48px; align-items:flex-start">
+        <div role="group" aria-label="Choose a model" style="flex:1 1 280px; min-width:0; border-bottom:1px solid #0A0A0A">
+          <sc-for list="{{ products }}" as="p" hint-placeholder-count="3">
+            <button class="ds-pick ds-h" data-on="{{ p.on }}" aria-pressed="{{ p.pressed }}" onClick="{{ p.pick }}" style="width:100%; min-height:88px; padding:0 20px; border-top:1px solid #0A0A0A; display:flex; align-items:center; justify-content:space-between; gap:16px">
+              <span style="display:flex; align-items:baseline; gap:16px">
+                <span class="ds-mono">{{ p.no }}</span>
+                <span class="ds-disp" style="font-size:clamp(15px, 1.7vw, 22px); text-transform:none">{{ p.name }}</span>
+              </span>
+              <span class="ds-ico" data-d="right" aria-hidden="true">
+                <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M0 2h3v1H0zM2 0h1v1H2zM2 4h1v1H2zM3 1h1v3H3zM4 2h1v1H4z"></path></svg>
+                <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M0 2h3v1H0zM2 0h1v1H2zM2 4h1v1H2zM3 1h1v3H3zM4 2h1v1H4z"></path></svg>
+              </span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="flex:2.2 1 440px; min-width:0; display:flex; flex-direction:column; gap:32px">
+          <div class="ds-stage" data-zoom-stage="s" data-rv="{{ sz.rv }}" onMouseMove="{{ sz.move }}" onMouseLeave="{{ sz.leave }}" onDoubleClick="{{ sz.reset }}" style="position:relative; aspect-ratio:16 / 10; overflow:hidden; background-color:#0E0E0E; color:#FFFFFF">
+            <div class="ds-zl" role="img" aria-label="Image placeholder: {{ cur.ph }}" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; background-image:linear-gradient(#202020 1px, transparent 1px), linear-gradient(90deg, #202020 1px, transparent 1px); background-size:40px 40px; transform: {{ sz.transform }}; transform-origin: {{ sz.origin }}">
+              <svg width="56" height="55" viewBox="0 0 772 756" fill="currentColor" aria-hidden="true"><path d="M0 0h156v156H0zM318 1h292v155H318zM156 163h154v155H156zM610 164h162v430H610zM17 326h121v105H17zM326 326h130v104H326zM164 556L317 446V596H610V756H164z"></path></svg>
+              <span class="ds-disp" style="font-size:clamp(16px, 2vw, 28px); text-transform:none">{{ cur.ph }}</span>
+              <span class="ds-mono" style="opacity:.7">Image placeholder</span>
+            </div>
+            <i class="ds-br tl" aria-hidden="true"></i>
+            <i class="ds-br tr" aria-hidden="true"></i>
+            <i class="ds-br bl" aria-hidden="true"></i>
+            <i class="ds-br brr" aria-hidden="true"></i>
+            <div class="ds-mm" data-on="{{ sz.mm }}" aria-hidden="true" style="width:80px; height:50px"><i style="left: {{ sz.mmL }}; top: {{ sz.mmT }}; width: {{ sz.mmS }}; height: {{ sz.mmS }}"></i></div>
+            <span class="ds-mono" style="position:absolute; left:44px; bottom:36px">Fig. {{ cur.no }}</span>
+            <span class="ds-mono" style="position:absolute; right:44px; bottom:36px">Zoom {{ sz.label }}</span>
+            <div class="ds-ruler" aria-hidden="true"></div>
+            <input class="ds-zoom" type="range" min="1" max="3" step="0.1" value="{{ sz.value }}" onChange="{{ sz.setZoom }}" aria-label="Zoom {{ cur.name }} image">
+            <div class="ds-ret" data-on="{{ sz.rv }}" data-f="{{ sz.rf }}" aria-hidden="true" style="left: {{ sz.rx }}; top: {{ sz.ry }}"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="dot"></i><span class="ds-mono">{{ sz.tip }}</span></div>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:32px 48px">
+            <div style="flex:1 1 260px; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:16px">
+              <span class="ds-mono" style="color:#4D4D4D">Model {{ cur.no }} / 03</span>
+              <h3 class="ds-disp" style="margin:0; font-size:clamp(24px, 3vw, 40px); line-height:1.1; text-transform:none">{{ cur.name }}</h3>
+              <p style="margin:0; max-width:420px; color:#4D4D4D">[Product description: what makes this model different, in two or three sentences.]</p>
+              <div style="display:flex; flex-wrap:wrap; align-items:center; gap:16px 24px; margin-top:8px">
+                <strong class="ds-disp" style="font-size:18px">[€ PRICE]</strong>
+                <a href="#contact" class="ds-mono ds-btn ds-h">Get notified
+                  <span class="ds-ico" data-d="down" aria-hidden="true">
+                    <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M2 0h1v3H2zM0 2h1v1H0zM4 2h1v1H4zM1 3h3v1H1zM2 4h1v1H2z"></path></svg>
+                    <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M2 0h1v3H2zM0 2h1v1H0zM4 2h1v1H4zM1 3h3v1H1zM2 4h1v1H2z"></path></svg>
+                  </span>
+                </a>
+              </div>
+            </div>
+            <div style="flex:1 1 260px; min-width:0; display:flex; flex-direction:column; border-top:1px solid #0A0A0A; align-self:flex-start">
+              <div style="display:flex; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid #BDBDBD"><span style="color:#4D4D4D">Display</span><span>TBD</span></div>
+              <div style="display:flex; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid #BDBDBD"><span style="color:#4D4D4D">Connection</span><span>TBD</span></div>
+              <div style="display:flex; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid #BDBDBD"><span style="color:#4D4D4D">Compatibility</span><span>TBD</span></div>
+              <div style="display:flex; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid #BDBDBD"><span style="color:#4D4D4D">Mounting</span><span>TBD</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 COMPARE -->
+  <section id="compare" style="position:relative; overflow:hidden; background:#070707">
+    <svg aria-hidden="true" viewBox="0 0 772 756" fill="currentColor" style="position:absolute; right:-4vw; bottom:48px; width:clamp(240px, 32vw, 500px); height:auto; color:#FFFFFF; opacity:0.05; pointer-events:none"><path d="M0 0h156v156H0zM318 1h292v155H318zM156 163h154v155H156zM610 164h162v430H610zM17 326h121v105H17zM326 326h130v104H326zM164 556L317 446V596H610V756H164z"></path></svg>
+    <div style="position:relative; max-width:1280px; margin:0 auto; padding:104px clamp(16px, 4vw, 40px) 112px; display:flex; flex-direction:column; gap:48px">
+      <div style="display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:32px">
+        <div style="display:flex; flex-direction:column; gap:20px">
+          <span class="ds-mono ds-tag" style="color:#9A9A9A">03 / Compare</span>
+          <h2 class="ds-disp" style="margin:0; font-size:clamp(26px, 5vw, 68px); line-height:1.12">Side by<br><span class="ds-out-l">side.</span></h2>
+        </div>
+        <div role="group" aria-label="Highlight a model" style="display:flex; flex-wrap:wrap; gap:8px">
+          <sc-for list="{{ products }}" as="p" hint-placeholder-count="3">
+            <button class="ds-chip on-dark" data-on="{{ p.on }}" aria-pressed="{{ p.pressed }}" onClick="{{ p.pick }}">{{ p.short }}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto">
+        <div role="table" aria-label="DDU series comparison" style="min-width:640px">
+          <div role="row" style="display:grid; grid-template-columns:minmax(150px, 1.1fr) repeat(3, minmax(120px, 1fr))">
+            <span role="columnheader" class="ds-cell ds-mono" data-on="0" style="display:flex; align-items:center; gap:10px; color:#9A9A9A; border-bottom-color:#FFFFFF"><svg width="14" height="14" viewBox="0 0 772 756" fill="currentColor" aria-hidden="true"><path d="M0 0h156v156H0zM318 1h292v155H318zM156 163h154v155H156zM610 164h162v430H610zM17 326h121v105H17zM326 326h130v104H326zM164 556L317 446V596H610V756H164z"></path></svg>Spec</span>
+            <span role="columnheader" class="ds-cell ds-disp" data-on="{{ col0 }}" style="font-size:14px; text-transform:none; border-bottom-color:#FFFFFF">DDU G1</span>
+            <span role="columnheader" class="ds-cell ds-disp" data-on="{{ col1 }}" style="font-size:14px; text-transform:none; border-bottom-color:#FFFFFF">DDU G1+</span>
+            <span role="columnheader" class="ds-cell ds-disp" data-on="{{ col2 }}" style="font-size:14px; text-transform:none; border-bottom-color:#FFFFFF">DDU G1Mini</span>
+          </div>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+            <div role="row" style="display:grid; grid-template-columns:minmax(150px, 1.1fr) repeat(3, minmax(120px, 1fr))">
+              <span role="rowheader" class="ds-cell" data-on="0" style="color:#9A9A9A">{{ r.label }}</span>
+              <span role="cell" class="ds-cell" data-on="{{ r.fa }}">{{ r.a }}</span>
+              <span role="cell" class="ds-cell" data-on="{{ r.fb }}">{{ r.b }}</span>
+              <span role="cell" class="ds-cell" data-on="{{ r.fc }}">{{ r.c }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 CONTACT -->
+  <section id="contact" style="position:relative; overflow:hidden; background:#FFFFFF; color:#0A0A0A">
+    <svg aria-hidden="true" viewBox="0 0 772 756" fill="currentColor" style="position:absolute; left:-5vw; top:-40px; width:clamp(240px, 30vw, 460px); height:auto; color:#0A0A0A; opacity:0.05; pointer-events:none"><path d="M0 0h156v156H0zM318 1h292v155H318zM156 163h154v155H156zM610 164h162v430H610zM17 326h121v105H17zM326 326h130v104H326zM164 556L317 446V596H610V756H164z"></path></svg>
+    <div style="position:relative; max-width:1280px; margin:0 auto; padding:104px clamp(16px, 4vw, 40px) 112px; display:flex; flex-wrap:wrap; gap:48px 64px; align-items:flex-end">
+      <div style="flex:1 1 360px; min-width:0; display:flex; flex-direction:column; gap:20px">
+        <span class="ds-mono ds-tag" style="color:#4D4D4D">04 / Contact</span>
+        <h2 class="ds-disp" style="margin:0; font-size:clamp(28px, 5vw, 68px); line-height:1.12">Get in<br><span class="ds-out-d">touch.</span></h2>
+      </div>
+      <div style="flex:1 1 360px; min-width:0; display:flex; flex-direction:column; border-top:1px solid #0A0A0A">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 16px; padding:20px 0; border-bottom:1px solid #BDBDBD"><span class="ds-mono" style="color:#4D4D4D">Email</span><span>anonimo0ao100@gmail.com</span></div>
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 16px; padding:20px 0; border-bottom:1px solid #BDBDBD"><span class="ds-mono" style="color:#4D4D4D">Instagram</span><span>[@handle]</span></div>
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 16px; padding:20px 0; border-bottom:1px solid #BDBDBD"><span class="ds-mono" style="color:#4D4D4D">YouTube</span><span>[channel]</span></div>
+        <div style="display:flex; flex-direction:column; gap:14px; padding:20px 0; border-bottom:1px solid #BDBDBD">
+          <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 16px">
+            <span class="ds-mono" style="color:#4D4D4D">Complaints book</span>
+            <a class="ds-h" href="Legal.dc.html#complaints" style="display:inline-flex; align-items:center; gap:12px; min-height:44px; border-bottom:1px solid #0A0A0A">Open the complaints book
+              <span class="ds-ico" data-d="right" aria-hidden="true">
+                <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M0 2h3v1H0zM2 0h1v1H2zM2 4h1v1H2zM3 1h1v3H3zM4 2h1v1H4z"></path></svg>
+                <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M0 2h3v1H0zM2 0h1v1H2zM2 4h1v1H2zM3 1h1v3H3zM4 2h1v1H4z"></path></svg>
+              </span>
+            </a>
+          </div>
+          <p style="margin:0; max-width:520px; font-size:14px; line-height:1.7; color:#4D4D4D">DYNAMIS is not yet a registered company, so it is not yet enrolled in the official Livro de Reclamações Eletrónico. Until it is, complaints are received through our own form and by email, and answered within 15 working days.</p>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px 24px; padding-top:28px">
+          <img src="./assets/5a10825ed1aaa73601780c60d247c9ec.png" alt="Dynamis" style="display:block; height:30px; width:auto; filter:invert(1)">
+          <span class="ds-mono" style="color:#4D4D4D">Discipline drives distance.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="background:#070707; color:#FFFFFF">
+    <div style="max-width:1280px; margin:0 auto; padding:72px clamp(16px, 4vw, 40px) 32px; display:flex; flex-direction:column; gap:48px">
+      <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:16px 32px">
+        <a href="#top" style="display:inline-flex; align-items:center; min-height:56px">
+          <img src="./assets/5a10825ed1aaa73601780c60d247c9ec.png" alt="Dynamis" style="display:block; height:44px; width:auto">
+        </a>
+        <nav aria-label="Footer" class="ds-mono" style="display:flex; flex-wrap:wrap; align-items:center; gap:0 28px; color:#9A9A9A">
+          <a class="ds-nl" href="#principles" style="display:inline-flex; align-items:center; min-height:44px">Principles</a>
+          <a class="ds-nl" href="#series" style="display:inline-flex; align-items:center; min-height:44px">Series</a>
+          <a class="ds-nl" href="#compare" style="display:inline-flex; align-items:center; min-height:44px">Compare</a>
+          <a class="ds-nl" href="#contact" style="display:inline-flex; align-items:center; min-height:44px">Contact</a>
+          <a href="#top" class="ds-h" style="display:inline-flex; align-items:center; gap:12px; min-height:44px; color:#FFFFFF">Back to top
+            <span class="ds-ico" data-d="up" aria-hidden="true">
+              <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M2 2h1v3H2zM0 2h1v1H0zM4 2h1v1H4zM1 1h3v1H1zM2 0h1v1H2z"></path></svg>
+              <svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M2 2h1v3H2zM0 2h1v1H0zM4 2h1v1H4zM1 1h3v1H1zM2 0h1v1H2z"></path></svg>
+            </span>
+          </a>
+        </nav>
+      </div>
+
+      <div aria-hidden="true" style="overflow:hidden; height:calc(clamp(40px, 12.5vw, 170px) * 0.62)">
+        <div class="ds-disp" style="font-size:clamp(40px, 12.5vw, 170px); line-height:1; letter-spacing:-0.01em; color:transparent; -webkit-text-stroke:1.5px #4A4A4A">Dynamis</div>
+      </div>
+
+      <div class="ds-mono" style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px 32px; padding-top:24px; border-top:1px solid #2A2A2A; color:#9A9A9A">
+        <span style="display:inline-flex; align-items:center; gap:12px"><svg width="16" height="16" viewBox="0 0 772 756" fill="currentColor" aria-hidden="true"><path d="M0 0h156v156H0zM318 1h292v155H318zM156 163h154v155H156zM610 164h162v430H610zM17 326h121v105H17zM326 326h130v104H326zM164 556L317 446V596H610V756H164z"></path></svg>© 2026 Dynamis — Discipline drives distance.</span>
+        <nav aria-label="Legal" style="display:flex; flex-wrap:wrap; align-items:center; gap:0 24px">
+          <a class="ds-nl" href="Legal.dc.html#terms" style="display:inline-flex; align-items:center; min-height:44px">Terms of Use</a>
+          <a class="ds-nl" href="Legal.dc.html#privacy" style="display:inline-flex; align-items:center; min-height:44px">Privacy Policy</a>
+          <a class="ds-nl" href="Legal.dc.html#cookies" style="display:inline-flex; align-items:center; min-height:44px">Cookie Policy</a>
+          <button class="ds-nl ds-mono" type="button" onClick="{{ g.reopen }}" style="display:inline-flex; align-items:center; min-height:44px">Cookie settings</button>
+          <a class="ds-nl" href="Legal.dc.html#complaints" style="display:inline-flex; align-items:center; min-height:44px">Complaints book</a>
+        </nav>
+      </div>
+    </div>
+  </footer>
+
+  <!-- TERMS + COOKIES GATE: must be answered before using the site -->
+  <div class="ds-gate" data-open="{{ g.open }}" data-custom="{{ g.custom }}" role="dialog" aria-modal="true" aria-labelledby="gate-title">
+    <div class="ds-gate-card">
+      <i class="ds-br tl"></i><i class="ds-br tr"></i><i class="ds-br bl"></i><i class="ds-br brr"></i>
+      <div style="display:flex; flex-direction:column; gap:22px">
+        <span class="ds-mono ds-tag" style="color:#9A9A9A">Before you continue</span>
+        <h2 id="gate-title" class="ds-disp" style="margin:0; font-size:clamp(20px, 3.4vw, 30px); line-height:1.2">Terms of Use <span class="ds-out-l">&amp;</span> Cookies</h2>
+        <p style="line-height:1.7; color:#E6E6E6">To use this website you need to accept our Terms of Use. Choosing either button below accepts them, and confirms that you have read our <a class="ds-ul" href="Legal.dc.html#privacy">Privacy Policy</a> and <a class="ds-ul" href="Legal.dc.html#cookies">Cookie Policy</a>. Read the full <a class="ds-ul" href="Legal.dc.html#terms">Terms of Use</a> first if you like.</p>
+        <p style="line-height:1.7; color:#9A9A9A; font-size:14px">Strictly necessary cookies are always on, because the site cannot work without them. Analytics and marketing cookies stay off unless you turn them on. Accepting the Terms never requires accepting optional cookies. You can change your choice later with "Cookie settings" in the footer. Anyone can use this site, at any age; if you are under 13, ask a parent or guardian to help with the cookie choice. Your legal rights are not affected.</p>
+
+        <div class="ds-opt">
+          <div class="ds-orow">
+            <div style="display:flex; flex-direction:column; gap:4px">
+              <span class="ds-mono">Strictly necessary</span>
+              <span style="color:#9A9A9A; font-size:14px; line-height:1.6">Remembers your terms and cookie choice. Always on.</span>
+            </div>
+            <button type="button" class="ds-sw" role="switch" aria-checked="true" aria-disabled="true" aria-label="Strictly necessary cookies, always on" data-lock="1"></button>
+          </div>
+          <div class="ds-orow">
+            <div style="display:flex; flex-direction:column; gap:4px">
+              <span class="ds-mono">Analytics</span>
+              <span style="color:#9A9A9A; font-size:14px; line-height:1.6">Helps us understand how the site is used. Off by default.</span>
+            </div>
+            <button type="button" class="ds-sw" role="switch" aria-checked="{{ g.an }}" aria-label="Analytics cookies" onClick="{{ g.toggleAn }}"></button>
+          </div>
+          <div class="ds-orow">
+            <div style="display:flex; flex-direction:column; gap:4px">
+              <span class="ds-mono">Marketing</span>
+              <span style="color:#9A9A9A; font-size:14px; line-height:1.6">Used to show relevant offers. Off by default.</span>
+            </div>
+            <button type="button" class="ds-sw" role="switch" aria-checked="{{ g.mk }}" aria-label="Marketing cookies" onClick="{{ g.toggleMk }}"></button>
+          </div>
+        </div>
+
+        <div class="ds-gate-btns main">
+          <button type="button" class="ds-chip on-dark" onClick="{{ g.essential }}">Essential only</button>
+          <button type="button" class="ds-chip on-dark" onClick="{{ g.acceptAll }}">Accept all</button>
+        </div>
+        <div class="ds-gate-btns save">
+          <button type="button" class="ds-chip on-dark" onClick="{{ g.saveSel }}">Save choices &amp; accept Terms</button>
+        </div>
+        <div class="ds-mono" style="display:flex; flex-wrap:wrap; gap:0 24px; color:#9A9A9A">
+          <button type="button" class="ds-nl" onClick="{{ g.showCustom }}" style="display:inline-flex; align-items:center; min-height:44px">Customise cookies</button>
+          <a class="ds-nl" href="Legal.dc.html#terms" style="display:inline-flex; align-items:center; min-height:44px">Read the Terms</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":5650}}'>
+class Component extends DCLogic {
+  _n(key, dflt) {
+    const v = this.state && this.state[key];
+    return typeof v === 'number' ? v : dflt;
+  }
+
+  componentDidMount() {
+    this._bound = [];
+    this._acc = {};
+    this._bindZoom();
+    this._readConsent();
+  }
+
+  // Terms + cookie choice, kept in this browser only. Asked again after 12 months or when the Terms version changes.
+  _readConsent() {
+    try {
+      const raw = window.localStorage.getItem('dynamis-consent');
+      if (!raw) return;
+      const c = JSON.parse(raw);
+      const fresh = c && c.terms === true && c.v === '2026-11-02' && c.at && (Date.now() - Date.parse(c.at)) < 365 * 24 * 3600 * 1000;
+      if (fresh) this.setState({ gate: false, gcustom: false, gan: !!c.analytics, gmk: !!c.marketing });
+    } catch (err) {}
+  }
+
+  _save(an, mk) {
+    try {
+      window.localStorage.setItem('dynamis-consent', JSON.stringify({ terms: true, analytics: !!an, marketing: !!mk, at: new Date().toISOString(), v: '2026-11-02' }));
+    } catch (err) {}
+    this.setState({ gate: false, gcustom: false, gan: !!an, gmk: !!mk });
+  }
+
+  _gate() {
+    const s = this.state || {};
+    const an = s.gan === true;
+    const mk = s.gmk === true;
+    return {
+      open: s.gate === false ? '0' : '1',
+      custom: s.gcustom === true ? '1' : '0',
+      an: an ? 'true' : 'false',
+      mk: mk ? 'true' : 'false',
+      toggleAn: () => this.setState({ gan: !(this.state && this.state.gan === true) }),
+      toggleMk: () => this.setState({ gmk: !(this.state && this.state.gmk === true) }),
+      showCustom: () => this.setState({ gcustom: true }),
+      acceptAll: () => this._save(true, true),
+      essential: () => this._save(false, false),
+      saveSel: () => this._save(this.state && this.state.gan === true, this.state && this.state.gmk === true),
+      reopen: () => this.setState({ gate: true, gcustom: true })
+    };
+  }
+
+  componentDidUpdate() {
+    this._bindZoom();
+  }
+
+  componentWillUnmount() {
+    (this._bound || []).forEach((b) => {
+      try { b[0].removeEventListener('wheel', b[1]); } catch (err) {}
+    });
+    this._bound = [];
+  }
+
+  // Native non-passive wheel listener: while the mouse is over a photo the page never scrolls.
+  _bindZoom() {
+    if (!this._bound) this._bound = [];
+    try {
+      const stages = document.querySelectorAll('[data-zoom-stage]');
+      stages.forEach((el) => {
+        if (el.__dsZoomBound) return;
+        el.__dsZoomBound = true;
+        const fn = (e) => this._onWheel(e, el);
+        el.addEventListener('wheel', fn, { passive: false });
+        this._bound.push([el, fn]);
+      });
+    } catch (err) {}
+  }
+
+  // One wheel notch = one 0.1 step (1.0x to 3.0x). Small trackpad deltas accumulate into a step.
+  _onWheel(e, el) {
+    e.preventDefault();
+    const k = el.getAttribute('data-zoom-stage');
+    const zk = 'z' + k;
+    const xk = k + 'x';
+    const yk = k + 'y';
+    const vk = k + 'v';
+    let dy = e.deltaY;
+    if (e.deltaMode === 1) dy *= 16;
+    else if (e.deltaMode === 2) dy *= 100;
+    if (!this._acc) this._acc = {};
+    let acc = this._acc[k] || 0;
+    if (acc !== 0 && (acc < 0) !== (dy < 0)) acc = 0;
+    acc += dy;
+    let step = 0;
+    if (Math.abs(acc) >= 40) {
+      step = acc < 0 ? 0.1 : -0.1;
+      acc = 0;
+    }
+    this._acc[k] = acc;
+    const cur = this._n(zk, 1);
+    const next = Math.round(Math.min(3, Math.max(1, cur + step)) * 10) / 10;
+    const r = el.getBoundingClientRect();
+    const px = Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100));
+    const py = Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100));
+    this.setState({ [zk]: next, [xk]: px, [yk]: py, [vk]: 1 });
+  }
+
+  _move(e, xk, yk, vk) {
+    if (e.target && e.target.tagName === 'INPUT') {
+      if (this._n(vk, 0)) this.setState({ [vk]: 0 });
+      return;
+    }
+    const r = e.currentTarget.getBoundingClientRect();
+    const px = Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100));
+    const py = Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100));
+    this.setState({ [xk]: px, [yk]: py, [vk]: 1 });
+  }
+
+  renderVals() {
+    const sel = this._n('sel', 0);
+    const base = [
+      { no: '01', name: 'DDU G1', short: 'G1', ph: 'Dynamis DDU G1' },
+      { no: '02', name: 'DDU G1+', short: 'G1+', ph: 'Dynamis DDU G1+' },
+      { no: '03', name: 'DDU G1Mini', short: 'G1Mini', ph: 'Dynamis DDU G1Mini' }
+    ];
+    const products = base.map((p, i) => ({
+      no: p.no,
+      name: p.name,
+      short: p.short,
+      ph: p.ph,
+      on: i === sel ? '1' : '0',
+      pressed: i === sel ? 'true' : 'false',
+      pick: () => this.setState({ sel: i, zh: 1, zs: 1, hx: 50, hy: 50, sx: 50, sy: 50 })
+    }));
+
+    const view = (zk, xk, yk, vk) => {
+      const z = this._n(zk, 1);
+      const px = this._n(xk, 50);
+      const py = this._n(yk, 50);
+      const zoomed = z > 1.001;
+      const k = 1 - 1 / z;
+      return {
+        transform: 'scale(' + z.toFixed(2) + ')',
+        origin: px.toFixed(1) + '% ' + py.toFixed(1) + '%',
+        value: z,
+        label: z.toFixed(1) + '×',
+        tip: zoomed ? z.toFixed(1) + '×' : 'Scroll to zoom',
+        rx: px.toFixed(2) + '%',
+        ry: py.toFixed(2) + '%',
+        rv: this._n(vk, 0) ? '1' : '0',
+        rf: px > 60 ? '1' : '0',
+        mm: zoomed ? '1' : '0',
+        mmL: (px * k).toFixed(2) + '%',
+        mmT: (py * k).toFixed(2) + '%',
+        mmS: (100 / z).toFixed(2) + '%',
+        setZoom: (e) => {
+          const v = parseFloat(e.target.value);
+          if (!isNaN(v)) this.setState({ [zk]: Math.round(Math.min(3, Math.max(1, v)) * 10) / 10 });
+        },
+        reset: () => this.setState({ [zk]: 1, [xk]: 50, [yk]: 50 }),
+        move: (e) => this._move(e, xk, yk, vk),
+        leave: () => this.setState({ [vk]: 0 })
+      };
+    };
+
+    const labels = ['Display size', 'Resolution', 'Connection', 'Compatibility', 'Mounting', 'Dimensions', 'Weight', 'Price'];
+    const fa = sel === 0 ? '1' : '0';
+    const fb = sel === 1 ? '1' : '0';
+    const fc = sel === 2 ? '1' : '0';
+    const rows = labels.map((label) => {
+      const v = label === 'Price' ? '[€ PRICE]' : 'TBD';
+      return { label: label, a: v, b: v, c: v, fa: fa, fb: fb, fc: fc };
+    });
+    const principles = [
+      { no: '01', word: 'Discipline', o: '0' },
+      { no: '02', word: 'Drives', o: '1' },
+      { no: '03', word: 'Distance', o: '0' }
+    ];
+    return {
+      g: this._gate(),
+      cur: products[sel],
+      products: products,
+      hz: view('zh', 'hx', 'hy', 'hv'),
+      sz: view('zs', 'sx', 'sy', 'sv'),
+      rows: rows,
+      principles: principles,
+      col0: fa,
+      col1: fb,
+      col2: fc
+    };
+  }
+}
+</script>
+</body>
+</html>
